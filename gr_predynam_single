@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# takes generated complex coordinates and topology
+# invoke: > bash gr.sh <complex_name>
+
+gmx editconf -f ${1}.gro -o cmplxbx_${1}.gro -d 1.5
+
+gmx solvate -cp cmplxbx_${1}.gro -cs spc216.gro -p topol_$1.top -o solv_${1}.gro
+
+gmx grompp -f em.mdp -c solv_${1}.gro -p topol_$1.top -o ions.tpr
+
+echo SOL | gmx genion -s ions.tpr -o solv_ions_${1}.gro -p topol_$1.top -neutral -conc 0.15
+
+gmx grompp -f em_real.mdp -c solv_ions_${1}.gro -p topol_$1.top -o em.tpr
+
+gmx mdrun -v -s em.tpr -o em_$1.trr -g em_$1.log -cpi em_$1.cpt -c em -nt 4
+
+gmx grompp -f nvt.mdp -c em.gro -p topol_$1.top -o nvt_$1.tpr -v
+
+gmx mdrun -v -s nvt_$1.tpr -o nvt_$1.trr -g $1.log -cpi $1.cpt -c nvt -nt 4
+
+gmx grompp -f md_pull.mdp -c nvt -p topol_$1.top -o pull_$1.tpr
