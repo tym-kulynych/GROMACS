@@ -1,0 +1,112 @@
+#!/bin/bash
+source /usr/local/gromacs/bin/GMXRC
+echo "!! generating ndx file !!"
+read -p "Please type the number of a/a residues -->" resnum
+i=0
+read -p "Please give the name of the 1st level directory where your files are -->" name
+count ()
+{
+for i in $(seq 1 $resnum); do
+echo "r $i" 
+done
+echo " "
+echo "q"
+}
+count|gmx make_ndx -f ./$name/nvt.gro -o ./$name/script_aares.ndx
+echo "!! generating ndx file = DONE !!"
+
+read -p "Please type the number of energy groups you already have in your *.mdp, excluding Protein -->" alrgrps
+read -p "Please type them now, separating with single spaces -->" string
+
+let 'numgrps=62-alrgrps'
+let 'num=(resnum - resnum%numgrps)/numgrps'
+
+echo "!! generating tpr files !!"
+for ((i=1;i<=num;i++))
+	do
+	#generating energygrps line in the *.mdp file
+	cp ./md.mdp ./$name/md.mdp
+	let 'k=(i-1)*numgrps'
+	let 'm=(i)*numgrps-1'
+	echo -n "energygrps          = $string " >> ./$name/md.mdp
+	for ((j=k;j<=m;j++))
+		do
+		if [[ j -eq 0 ]]
+		then 
+		continue
+		fi		
+		echo -n "r_$j " >> ./$name/md.mdp
+		echo -n "r_$j " >> control.txt
+		done
+	
+  #got our md.mdp, invoking gmx grompp
+	echo "_________ $i num $num__________" >> control.txt
+	gmx grompp -f ./$name/md.mdp -n ./$name/script_aares.ndx -c ./$name/nvt -p ./$name/topol_$name.top -o ./$name/md_${name}_${i}.tpr
+	#removing done md.mdp
+	rm -r ./$name/md.mdp
+	done
+
+#generating one more tpr for the MOD (the rest of amino acids in the protein)
+cp ./md.mdp ./$name/md.mdp
+j=0 
+echo -n "energygrps          = $string " >> ./$name/md.mdp
+for ((j=num*$numgrps;j<=resnum;j++))
+	do
+	echo -n "r_$j " >> ./$name/md.mdp
+	echo -n "r_$j " >> control.txt
+	done
+gmx grompp -f ./$name/md.mdp -n ./$name/script_aares.ndx -c ./$name/nvt -p ./$name/topol_$name.top -o ./$name/md_${name}_last.tpr
+rm -r ./$name/md.mdp
+echo "!! generating tpr files = DONE!!"
+
+echo "Now it is time to analyse your terms!"
+read -p "Please type the name of your energy file , e.g: _ script _ - WITHOUT any spaces before and after the name" enername
+read -p "Please type the path to your Dir, e.g: _ ./path/to/the/dir/ _ - WITHOUT any spaces after the last dash" path
+
+let 'numgrps=62-alrgrps'
+let 'num=(resnum - resnum%numgrps)/numgrps'
+
+for ((i=1;i<=num;i++))
+do
+tpr = md_${name}_${i}
+echo "I shall now let you see the numbers of terms, invoking gmx energy for you; when you know your terms, please go out of it"
+
+gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee
+
+read -p "Please type your first energy group for the analysis" x
+read -p "Please type your ending number of group in the options list" y
+
+
+    while [[ x -lt y ]] 
+    do
+    let 'x1=x+1'; let 'x2=x+2'; let 'x3=x+3';
+    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee > out.txt
+    rm -r ./$path/script_check_control.xvg
+    grep -A 5 "Coul" out.txt >> out_res.txt
+    let 'x=x+4'
+    done 
+
+done
+
+#analysing the last tpr (the rest of amino acids in the protein)
+tpr = md_${name}_last
+
+echo "I shall now let you see the numbers of terms, invoking gmx energy for you; when you know your terms, please go out of it"
+
+gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee
+
+read -p "Please type your first energy group for the analysis" x
+read -p "Please type your ending number of group in the options list" y
+
+    while [[ x -lt y ]] 
+    do
+    let 'x1=x+1'; let 'x2=x+2'; let 'x3=x+3';
+    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee > out.txt
+    rm -r ./$path/script_check_control.xvg
+    grep -A 5 "Coul" out.txt >> out_res.txt
+    let 'x=x+4'
+    done 
+
+echo "Thank you! Your results are in out_res.txt (Home Dir)"
+
+
