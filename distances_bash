@@ -1,0 +1,11 @@
+#!/bin/bash
+
+source /usr/local/gromacs/bin/GMXRC
+
+for ((i=0;i<=2500;i++))
+do 
+echo 'com of group "site" plus com of group "UNK"'| gmx distance -s ./UNK_gtp_pull/pull3NNY_gtpnew.tpr -f ./recalc/gtp_perl/distg${i}.gro -n ./UNK_gtp_pull/UNK_gtp2.ndx -oall ./recalc/gtp_perl/dst${i}.xvg -select 
+echo -n "${i} " >> dist.txt 
+echo $( tail -n 1 ./recalc/gtp_perl/dst${i}.xvg ) >> dist.txt
+rm -r ./recalc/gtp_perl/dst${i}.xvg
+done
