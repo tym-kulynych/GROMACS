@@ -1,6 +1,6 @@
 #!/bin/bash
 source /usr/local/gromacs/bin/GMXRC
-for name in UNK_atp_pull UNK_gtp_pull do
+for name in UNK_atp_pull UNK_gtp_pull; do
 
 echo "!! generating ndx file !!"
 read -p "Please type the number of a/a residues -->" resnum
