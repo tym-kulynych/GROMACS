@@ -1,12 +1,14 @@
 #!/bin/bash
 source /usr/local/gromacs/bin/GMXRC
+for name in UNK_atp_pull UNK_gtp_pull do
+
 echo "!! generating ndx file !!"
 read -p "Please type the number of a/a residues -->" resnum
 i=0
-read -p "Please give the name of the 1st level directory where your files are -->" name
+
 count ()
 {
-for i in $(seq 1 $resnum); do
+for i in $(seq 7 $resnum); do
 echo "r $i" 
 done
 echo " "
@@ -31,7 +33,7 @@ for ((i=1;i<=num;i++))
 	echo -n "energygrps          = $string " >> ./$name/md.mdp
 	for ((j=k;j<=m;j++))
 		do
-		if [[ j -eq 0 ]]
+		if [[( ${j} -lt 7) || ( ${j} -ge 157 && ${j} -le 165)]]
 		then 
 		continue
 		fi		
@@ -41,7 +43,8 @@ for ((i=1;i<=num;i++))
 	
   #got our md.mdp, invoking gmx grompp
 	echo "_________ $i num $num__________" >> control.txt
-	gmx grompp -f ./$name/md.mdp -n ./$name/script_aares.ndx -c ./$name/nvt -p ./$name/topol_$name.top -o ./$name/md_${name}_${i}.tpr
+	gmx grompp -f ./$name/md.mdp -n ./${name}/script_aares.ndx -c ./${name}/nvt -p ./${name}/topol_${name}.top -o ./${name}/md_${name}_${i}.tpr
+        gmx mdrun -v -rerun /home/tim/recalc/pull3NNY_${name}_new.xtc -s ./${name}/md_${name}_${i}.tpr -o ${i}.trr -g ${i}.log -cpi ${i}.cpt -c ${i} -e ./${name}/ener_${i}.edr -nt 4
 	#removing done md.mdp
 	rm -r ./$name/md.mdp
 	done
@@ -55,32 +58,31 @@ for ((j=num*$numgrps;j<=resnum;j++))
 	echo -n "r_$j " >> ./$name/md.mdp
 	echo -n "r_$j " >> control.txt
 	done
-gmx grompp -f ./$name/md.mdp -n ./$name/script_aares.ndx -c ./$name/nvt -p ./$name/topol_$name.top -o ./$name/md_${name}_last.tpr
+gmx grompp -f ./${name}/md.mdp -n ./${name}/script_aares.ndx -c ./${name}/nvt -p ./${name}/topol_${name}.top -o ./$name/md_${name}_last.tpr
+gmx mdrun -v -rerun /home/tim/recalc/pull3NNY_${name}_new.xtc -s ./$name/md_${name}_last.tpr -o ${i}.trr -g ${i}.log -cpi ${i}.cpt -c ${i} -e ./${name}/ener_${i}.edr -nt 4
 rm -r ./$name/md.mdp
 echo "!! generating tpr files = DONE!!"
 
 echo "Now it is time to analyse your terms!"
-read -p "Please type the name of your energy file , e.g: _ script _ - WITHOUT any spaces before and after the name" enername
-read -p "Please type the path to your Dir, e.g: _ ./path/to/the/dir/ _ - WITHOUT any spaces after the last dash" path
+path=${name}
 
 let 'numgrps=62-alrgrps'
 let 'num=(resnum - resnum%numgrps)/numgrps'
 
 for ((i=1;i<=num;i++))
 do
-tpr = md_${name}_${i}
+tpr_n=md_${name}_${i}
 echo "I shall now let you see the numbers of terms, invoking gmx energy for you; when you know your terms, please go out of it"
 
-gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee
+gmx energy -f ./${path}/ener_${i}.edr -s ./${path}/${tpr_n}.tpr -o ./$path/script_check_control.xvg -sum -fee
 
-read -p "Please type your first energy group for the analysis" x
-read -p "Please type your ending number of group in the options list" y
-
+read -p "Please type your first energy group for the analysis --->" x
+read -p "Please type your ending number of group in the options list --->" y
 
     while [[ x -lt y ]] 
     do
     let 'x1=x+1'; let 'x2=x+2'; let 'x3=x+3';
-    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee > out.txt
+    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./${path}/ener_${i}.edr -s ./$path/${tpr_n}.tpr -o ./$path/script_check_control.xvg -sum -fee > out.txt
     rm -r ./$path/script_check_control.xvg
     grep -A 5 "Coul" out.txt >> out_res.txt
     let 'x=x+4'
@@ -89,11 +91,11 @@ read -p "Please type your ending number of group in the options list" y
 done
 
 #analysing the last tpr (the rest of amino acids in the protein)
-tpr = md_${name}_last
+tpr_n=md_${name}_last
 
 echo "I shall now let you see the numbers of terms, invoking gmx energy for you; when you know your terms, please go out of it"
 
-gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee
+gmx energy -f ./${path}/ener_${i}.edr -s ./${path}/${tpr_n}.tpr -o ./${path}/script_check_control.xvg -sum -fee
 
 read -p "Please type your first energy group for the analysis" x
 read -p "Please type your ending number of group in the options list" y
@@ -101,12 +103,11 @@ read -p "Please type your ending number of group in the options list" y
     while [[ x -lt y ]] 
     do
     let 'x1=x+1'; let 'x2=x+2'; let 'x3=x+3';
-    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./$path/$enername.edr -s ./$path/$tpr.tpr -o ./$path/script_check_control.xvg -sum -fee > out.txt
-    rm -r ./$path/script_check_control.xvg
+    echo "$x ${x1} ${x2} ${x3} 0" |gmx energy -f ./${path}/ener_${i}.edr -s ./${path}/${tpr_n}.tpr -o ./${path}/script_check_control.xvg -sum -fee > out.txt
+    rm -r ./${path}/script_check_control.xvg
     grep -A 5 "Coul" out.txt >> out_res.txt
     let 'x=x+4'
     done 
 
 echo "Thank you! Your results are in out_res.txt (Home Dir)"
-
-
+done
